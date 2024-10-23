@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dwarf vs Goblins</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            touch-action: none;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+<script>
+// Canvas setup and game loop
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+document.body.appendChild(canvas);
+
+// Game state
+const state = {
+    dwarf: {
+        x: canvas.width / 4,
+        y: canvas.height - 100,
+        width: 50,
+        height: 50,
+        velocityY: 0,
+        isJumping: false,
+        isCharging: false,
+        chargeTime: 0,
+        attackPower: 1
+    },
+    goblins: [],
+    gravity: 0.8,
+    jumpForce: -15,
+    groundLevel: canvas.height - 100,
+    score: 0
+};
+
+// Game constants
+const CHARGE_RATE = 0.1;
+const MAX_CHARGE = 3;
+const GOBLIN_SPAWN_RATE = 0.02;
+
+// Touch handling
+let touchStartTime = 0;
+
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (!state.dwarf.isJumping) {
+        state.dwarf.velocityY = state.jumpForce;
+        state.dwarf.isJumping = true;
+    }
+    touchStartTime = Date.now();
+    state.dwarf.isCharging = true;
+});
+
+canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (state.dwarf.isCharging) {
+        const chargeTime = (Date.now() - touchStartTime) / 1000;
+        state.dwarf.attackPower = Math.min(chargeTime * CHARGE_RATE, MAX_CHARGE);
+        attack();
+        state.dwarf.isCharging = false;
+        state.dwarf.attackPower = 1;
+    }
+});
+
+// Game functions
+function attack() {
+    const attackRange = 100 * state.dwarf.attackPower;
+    state.goblins = state.goblins.filter(goblin => {
+        const distance = Math.abs(goblin.x - (state.dwarf.x + state.dwarf.width));
+        if (distance < attackRange) {
+            state.score += Math.floor(state.dwarf.attackPower);
+            return false;
+        }
+        return true;
+    });
+}
+
+function spawnGoblin() {
+    if (Math.random() < GOBLIN_SPAWN_RATE) {
+        state.goblins.push({
+            x: canvas.width,
+            y: state.groundLevel,
+            width: 40,
+            height: 40,
+            speed: -3
+        });
+    }
+}
+
+function update() {
+    // Update dwarf
+    if (state.dwarf.isJumping) {
+        state.dwarf.velocityY += state.gravity;
+        state.dwarf.y += state.dwarf.velocityY;
+
+        if (state.dwarf.y >= state.groundLevel) {
+            state.dwarf.y = state.groundLevel;
+            state.dwarf.isJumping = false;
+            state.dwarf.velocityY = 0;
+        }
+    }
+
+    // Update goblins
+    state.goblins.forEach(goblin => {
+        goblin.x += goblin.speed;
+    });
+
+    // Remove off-screen goblins
+    state.goblins = state.goblins.filter(goblin => goblin.x + goblin.width > 0);
+
+    // Spawn new goblins
+    spawnGoblin();
+}
+
+function draw() {
+    // Clear canvas
+    ctx.fillStyle = '#87CEEB';  // Sky blue
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw ground
+    ctx.fillStyle = '#8B4513';  // Saddle brown
+    ctx.fillRect(0, state.groundLevel + state.dwarf.height, canvas.width, canvas.height);
+
+    // Draw dwarf
+    ctx.fillStyle = '#FF0000';
+    ctx.fillRect(state.dwarf.x, state.dwarf.y, state.dwarf.width, state.dwarf.height);
+
+    // Draw attack charge indicator
+    if (state.dwarf.isCharging) {
+        const chargeTime = (Date.now() - touchStartTime) / 1000;
+        const chargeLevel = Math.min(chargeTime * CHARGE_RATE, MAX_CHARGE);
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(
+            state.dwarf.x,
+            state.dwarf.y - 20,
+            (state.dwarf.width * chargeLevel) / MAX_CHARGE,
+            10
+        );
+    }
+
+    // Draw goblins
+    ctx.fillStyle = '#00FF00';
+    state.goblins.forEach(goblin => {
+        ctx.fillRect(goblin.x, goblin.y, goblin.width, goblin.height);
+    });
+
+    // Draw score
+    ctx.fillStyle = '#000000';
+    ctx.font = '24px Arial';
+    ctx.fillText(`Score: ${state.score}`, 20, 40);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+gameLoop();
+</script>
+</body>
+</html>
